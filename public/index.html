@@ -1,1 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XuAutoFlix – TV, Películas y Series (auto)</title>
+<style>
+  :root{--red:#e50914;--black:#000;--dark:#141414;--gray:#808080;--white:#fff}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Netflix Sans",Arial,sans-serif}
+  body{background:var(--black);color:var(--white)}
+  #header-fixed{position:fixed;top:0;left:0;width:100%;background:var(--dark);z-index:1000}
+  header{padding:10px 4%;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .logo-wrap{display:flex;align-items:center;gap:8px}
+  .logo-img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+  .logo{font-size:1.4rem;font-weight:bold}.logo span{color:var(--red)}
+  nav{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  nav button{background:none;border:none;color:var(--gray);font-size:.85rem;padding:4px 8px;cursor:pointer}
+  nav button.active{color:var(--white);border-bottom:2px solid var(--red)}
+  #searchBox{padding:4px 8px;border:none;border-radius:4px;background:#333;color:var(--white);min-width:120px}
+  #reproductor{padding:0 4%}video{width:100%;max-height:35vh;border-radius:6px}
+  #controls{display:flex;justify-content:center;gap:10px;margin:6px 0}
+  #controls button{background:var(--red);color:var(--white);border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.75rem}
+  #iconos-sticky{position:sticky;top:calc(35vh + 70px);padding:6px 4%;background:var(--black);z-index:998}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px}
+  .item{cursor:pointer;transition:transform .15s}.item:hover{transform:scale(1.02)}
+  .item img{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:3px}
+  .item p{font-size:.6rem;margin-top:2px;color:var(--gray);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .loading{text-align:center;padding:20px;color:var(--gray)}
+  #modal-episodios{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;display:none;align-items:center;justify-content:center}
+  #modal-content{background:var(--dark);padding:20px;border-radius:8px;max-width:90%;max-height:80%;overflow-y:auto}
+  #modal-title{margin-bottom:10px;font-size:1.1rem}
+  #lista-episodios button{display:block;width:100%;margin:4px 0;background:var(--red);color:var(--white);border:none;padding:6px;border-radius:4px;cursor:pointer}
+  @media (min-width:600px){.grid{grid-template-columns:repeat(auto-fill,minmax(90px,1fr));.item p{font-size:.7rem}}}
+  @media (min-width:900px){.grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
+</style>
+</head>
+<body>
+  <div id="header-fixed">
+    <header>
+      <div class="logo-wrap">
+        <img class="logo-img" src="https://i.postimg.cc/0QKq131f/logo8-2-222011.png" alt="Logo">
+        <div class="logo"><span>Xu</span>per<span>F</span>lix</div>
+      </div>
+      <nav>
+        <button id="tab-tv" class="active">TV</button>
+        <button id="tab-movies">PELÍCULAS</button>
+        <button id="tab-series">SERIES</button>
+      </nav>
+      <input id="searchBox" placeholder="Buscar…">
+    </header>
+    <div id="reproductor">
+      <video id="player" controls></video>
+      <div id="controls">
+        <button id="prevBtn">Anterior</button>
+        <button id="nextBtn">Siguiente</button>
+      </div>
+    </div>
+  </div>
+  <div id="iconos-sticky">
+    <div id="conteudo"><div class="loading">Cargando lista…</div></div>
+  </div>
+  <div id="modal-episodios">
+    <div id="modal-content">
+      <h3 id="modal-title"></h3>
+      <div id="lista-episodios"></div>
+      <button onclick="document.getElementById('modal-episodios').style.display='none'">CERRAR</button>
+    </div>
+  </div>
 
+<script>
+/* CONFIGURACIÓN: pon aquí tu lista (M3U o M3U Plus) */
+const LISTA_URL = '/lista.m3u';
+
+/* -------------------------------------------------- */
+const defaultLogo = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAiIGhlaWdodD0iMTAwIiBmaWxsPSIjODA4MDgwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSI3MCIgaGVpZ2h0PSIxMDAiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiIgZm9udC1zaXplPSIxMnB4Ij5TVjwvdGV4dD48L3N2Zz4=';
+
+let allItems   = [];            // todos los canales/entradas
+let tvItems    = [];
+let movieItems = [];
+let seriesMap  = new Map();     // nombre -> {logo, episodios[]}
+
+let currentSection  = 'tv';
+let currentPlaylist = [];
+let currentIndex    = 0;
+
+const player     = document.getElementById('player');
+const cont       = document.getElementById('conteudo');
+const searchBox  = document.getElementById('searchBox');
+const tabs       = document.querySelectorAll('nav button');
+const prevBtn    = document.getElementById('prevBtn');
+const nextBtn    = document.getElementById('nextBtn');
+
+/* ---------- Parser M3U Plus ---------- */
+function parseM3U(text) {
+  const lines = text.split('\n');
+  const items = [];
+  let current = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (l.startsWith('#EXTINF')) {
+      const info = parseExtinf(l);
+      current = info;
+    } else if (l && !l.startsWith('#') && isPlayable(l)) {
+      if (!current) current = {};
+      current.url = l;
+      items.push(current);
+      current = null;
+    }
+  }
+  categorize(items);
+}
+
+function parseExtinf(line) {
+  const name = line.split(',').pop().trim();
+  const logo = line.match(/tvg-logo="([^"]+)"/)?.[1] || defaultLogo;
+  const group = line.match(/group-title="([^"]+)"/)?.[1]?.toLowerCase() || '';
+  return { name, logo, group };
+}
+
+function isPlayable(url) {
+  return /^(https?|rtmp):\/\/.+/i.test(url);
+}
+
+/* ---------- Clasificación automática ---------- */
+function categorize(items) {
+  items.forEach(it => {
+    const nm = it.name.toLowerCase();
+    if (it.group.includes('movie') || it.group.includes('pelicula')
+        || /\b(19|20)\d{2}\b/.test(it.name)) {
+      movieItems.push({ ...it, type: 'movies' });
+    } else if (it.group.includes('series') || nm.match(/t?\d{1,2}e\d{1,2}/i) || nm.includes('episodio')) {
+      // agrupar series
+      const title = nm.replace(/t?\d{1,2}e\d{1,2}.*/i, '').trim();
+      if (!seriesMap.has(title)) seriesMap.set(title, { logo: it.logo, episodios: [] });
+      const match = nm.match(/t?(\d{1,2})e(\d{1,2})/i);
+      const t = match ? match[1] : '1';
+      const e = match ? match[2] : String(seriesMap.get(title).episodios.length + 1);
+      seriesMap.get(title).episodios.push({
+        name: `T${t} E${e}`,
+        url: it.url,
+        fullName: it.name
+      });
+    } else {
+      tvItems.push({ ...it, type: 'tv' });
+    }
+  });
+  renderSection(currentSection);
+}
+
+/* ---------- Renderizado ---------- */
+function renderSection(section) {
+  currentSection = section;
+  tabs.forEach(t => t.classList.toggle('active', t.id === `tab-${section}`));
+
+  let list = [];
+  if (section === 'tv')      list = tvItems;
+  if (section === 'movies')  list = movieItems;
+  if (section === 'series')  list = Array.from(seriesMap.keys()).map(title => ({
+                                name: title,
+                                logo: seriesMap.get(title).logo,
+                                type: 'series',
+                                title
+                              }));
+
+  currentPlaylist = list;
+  render(list);
+}
+
+function render(list) {
+  cont.innerHTML = '';
+  if (!list.length) {
+    cont.innerHTML = '<p class="loading">Sin resultados.</p>';
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  list.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `
+      <img src="${item.logo}" alt="${item.name}" loading="lazy" onerror="this.src='${defaultLogo}'">
+      <p>${item.name}</p>
+    `;
+    el.onclick = () => {
+      if (item.type === 'series') openSeriesModal(item.title);
+      else {
+        currentPlaylist = list;
+        currentIndex = list.indexOf(item);
+        playIndex(currentIndex);
+      }
+    };
+    grid.appendChild(el);
+  });
+  cont.appendChild(grid);
+}
+
+function openSeriesModal(title) {
+  const serie = seriesMap.get(title);
+  if (!serie) return;
+  const modalTitle = document.getElementById('modal-title');
+  const lista = document.getElementById('lista-episodios');
+  modalTitle.textContent = title;
+  lista.innerHTML = '';
+  serie.episodios.forEach((ep, idx) => {
+    const btn = document.createElement('button');
+    btn.textContent = ep.name;
+    btn.onclick = () => {
+      currentPlaylist = serie.episodios;
+      currentIndex = idx;
+      playIndex(idx);
+      document.getElementById('modal-episodios').style.display = 'none';
+    };
+    lista.appendChild(btn);
+  });
+  document.getElementById('modal-episodios').style.display = 'flex';
+}
+
+function playIndex(i) {
+  if (i < 0 || i >= currentPlaylist.length) return;
+  currentIndex = i;
+  player.src = currentPlaylist[i].url;
+  player.play();
+}
+
+/* ---------- Eventos ---------- */
+prevBtn.addEventListener('click', () => playIndex(currentIndex - 1));
+nextBtn.addEventListener('click', () => playIndex(currentIndex + 1));
+tabs.forEach(btn => btn.addEventListener('click', () => renderSection(btn.id.replace('tab-', ''))));
+searchBox.addEventListener('input', () => {
+  const q = searchBox.value.toLowerCase();
+  let list = [];
+  if (currentSection === 'tv')      list = tvItems.filter(i => i.name.toLowerCase().includes(q));
+  if (currentSection === 'movies')  list = movieItems.filter(i => i.name.toLowerCase().includes(q));
+  if (currentSection === 'series')  list = Array.from(seriesMap.keys())
+                                      .filter(t => t.toLowerCase().includes(q))
+                                      .map(title => ({ name: title, logo: seriesMap.get(title).logo, type: 'series', title }));
+  currentPlaylist = list;
+  render(list);
+});
+
+/* ---------- Carga inicial ---------- */
+fetch(LISTA_URL)
+  .then(r => r.text())
+  .then(parseM3U)
+  .catch(err => { cont.innerHTML = '<p class="loading">Error al cargar lista.</p>'; console.error(err); });
+</script>
+</body>
+</html>

@@ -1,7 +1,29 @@
-      - name: Descargar lista
-        run: |
-          mkdir -p public
-          curl -L --max-time 30 --retry 5 -k \
-          -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3" \
-          "http://spacetvplay.com:8080/get.php?username=Granav30&password=ZPETU@@2&type=m3u_plus" \
-          -o public/lista.m3u
+name: Descargar lista Xtream cada 30 min
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Crear carpeta public si no existe
+      run: mkdir -p public
+
+    - name: Descargar lista
+      run: |
+        curl -L --max-time 30 --retry 5 -k \
+        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3" \
+        "http://spacetvplay.com:8080/get.php?username=Granav30&password=ZPETU@@2&type=m3u_plus" \
+        -o public/lista.m3u
+
+    - name: Commit & push si hubo cambios
+      run: |
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add public/lista.m3u
+        git diff --cached --quiet || (git commit -m "Lista actualizada" && git push)

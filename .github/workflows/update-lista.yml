@@ -11,20 +11,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Crear carpeta public si no existe
+      - name: Crear carpeta public
         run: mkdir -p public
 
       - name: Descargar lista
         run: |
-                - name: Descargar lista
-        run: |
-          mkdir -p public
           curl -L --max-time 30 --retry 3 -k \
           "http://spacetvplay.com:8080/get.php?username=Granav30&password=ZPETU@@2&type=m3u_plus" \
           -o public/lista.m3u
-          "http://spacetvplay.com:8080/get.php?username=Granav30&password=ZPETU@@2&type=m3u_plus"
 
-      - name: Commit & push si hubo cambios
+      - name: Commit & push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

@@ -18,7 +18,7 @@ jobs:
       run: |
         curl -L --max-time 30 --retry 5 -k \
         -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3" \
-        "http://esproipingttm.top:8080/get.php?username=es3291730888528001&password=31c30c64ed8d&type=m3u_plus" \
+        "http://38hacibaba38.gentv.to:8080/get.php?username=AlT7b3ILgX&password=dJshgtw4UK&type=m3u_plus" \
         -o public/lista.m3u
 
     - name: Commit & push si hubo cambios

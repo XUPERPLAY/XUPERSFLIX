@@ -16,7 +16,12 @@ jobs:
 
       - name: Descargar lista
         run: |
-          curl -L -o public/lista.m3u \
+                - name: Descargar lista
+        run: |
+          mkdir -p public
+          curl -L --max-time 30 --retry 3 -k \
+          "http://spacetvplay.com:8080/get.php?username=Granav30&password=ZPETU@@2&type=m3u_plus" \
+          -o public/lista.m3u
           "http://spacetvplay.com:8080/get.php?username=Granav30&password=ZPETU@@2&type=m3u_plus"
 
       - name: Commit & push si hubo cambios
